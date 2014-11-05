@@ -7,7 +7,6 @@ import Data.Attoparsec.Text
 import Data.Scientific (Scientific)
 import Data.Text hiding (takeWhile)
 import Data.Word
-import qualified Data.List as List
 import qualified Data.Map as Map
 
 
@@ -27,17 +26,22 @@ lettuce = LFun <$> (char '{' *> skipSpace *> identifier) <*> (skipSpace *> lettu
           LApp <$> (char '(' *> skipSpace *> lettuce) <*> (skipSpace *> lettuce <* skipSpace <* char ')') <|>
           LSym <$> identifier
 
-data LScope i = LScope Word (Map.Map i Word) deriving Show
-data LBind i = LBind [i] Word (Map.Map Word i) deriving Show
+data LettuceBinding i = LBind {
+  getSymbolCountL :: Word,
+  getFreeSymbolsL :: Map.Map i Word,
+  getSymbolTableL :: Map.Map Word i,
+  getExpressionL  :: Lettuce Word
+} deriving Show
 
-lbind :: (Eq i, Ord i) => Lettuce i -> (LBind i, Lettuce Word)
-lbind = rec (LScope 0 Map.empty)
+lbind :: (Eq i, Ord i) => Lettuce i -> LettuceBinding i
+lbind = rec Map.empty 0 Map.empty Map.empty
   where
-    rec (LScope w mi) (LFun i e) = (LBind (List.delete i f) w' (Map.insert w i mw), LFun w e')
-      where (LBind f w' mw, e') = rec (LScope (w + 1) (Map.insert i w mi)) e
-    rec (LScope w mi) (LApp f e) = (LBind (List.union ef ff) fw (Map.union emw fmw), LApp f' e')
-      where (LBind ef ew emw, e') = rec (LScope w mi) e
-            (LBind ff fw fmw, f') = rec (LScope ew mi) f
-    rec (LScope w mi) (LSym i) = case Map.lookup i mi of
-      Nothing -> (LBind [i] (w + 1) (Map.singleton w i), LSym w)
-      Just w' -> (LBind [] w Map.empty, LSym w')
+    rec ms w mf mb (LFun i e) = LBind w' mf' mb' (LFun w e')
+      where (LBind w' mf' mb' e') = rec (Map.insert i w ms) (w + 1) (Map.delete i mf) (Map.insert w i mb) e
+    rec ms w mf mb (LApp f e) = LBind ew (Map.union fmf emf) (Map.union fmb emb) (LApp f' e')
+      where (LBind fw fmf fmb f') = rec ms w mf mb f
+            (LBind ew emf emb e') = rec ms fw fmf fmb e
+    rec ms w mf mb (LSym i) = case (Map.lookup i mf, Map.lookup i ms) of
+      (Nothing, Nothing) -> LBind (w + 1) (Map.insert i w mf) (Map.insert w i mb) (LSym w)
+      (Just w', _)       -> LBind w mf mb (LSym w')
+      (_, Just w')       -> LBind w mf mb (LSym w')
