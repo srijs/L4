@@ -17,16 +17,27 @@ identifier = takeWhile1 (\c -> not (inClass "({[]})" c) && isPrint c && not (isS
 
 -- Lettuce is a tree of function literals and applications, with vectors and symbols of type i.
 
+-- product types (example a * b * c):
+--   decon a b c :: (a -> b -> c -> d) -> d
+--   con   a b c :: a -> b -> c -> decon a b c
+--   con   a b c == \f. f a b c 
+--   The constructor creates the deconstructor! The deconstructor is equivalent to the type.
+--   unit :: (f -> f) == id
+
+-- sum types: given a type a, there exist coercions (a -> b). values of type b can be tagged with a coercion, and thus become
+-- values of type a. Pattern matching on a value of type a requires a mapping of coercions to lambdas, like: 'case a of c {b b}' which is
+-- equivalent to c, where c is a coercion (a -> b), and a and b are of their respective types.
+
 data Lettuce i = LFun i (Lettuce i)
                | LApp (Lettuce i) (Lettuce i)
-               | LVec [Lettuce i]
+               | LTag (Lettuce i) (Lettuce i)
                | LSym i
   deriving Show
 
 lettuce :: Parser (Lettuce Text)
 lettuce = LFun <$> (char '{' *> skipSpace *> identifier) <*> (skipSpace *> lettuce <* skipSpace <* char '}') <|>
-          LApp <$> (char '(' *> skipSpace *> lettuce) <*> (skipSpace *> lettuce <* skipSpace <* char ')') <|>
-          LVec <$> (char '[' *> skipSpace *> sepBy lettuce (takeWhile1 isSpace) <* skipSpace <* char ']') <|>
+          LApp <$> (char '(' *> skipSpace *> lettuce)    <*> (skipSpace *> lettuce <* skipSpace <* char ')') <|>
+          LTag <$> (char '[' *> skipSpace *> lettuce)    <*> (skipSpace *> lettuce <* skipSpace <* char ']') <|>
           LSym <$> identifier
 
 data LettuceBinding sym id = LBind {
@@ -41,13 +52,12 @@ lbind = rec Map.empty minBound Map.empty Map.empty
   where
     rec scope id free tab (LFun sym e) = LBind id' free' tab' (LFun id e')
       where (LBind id' free' tab' e') = rec (Map.insert sym id scope) (succ id) (Map.delete sym free) (Map.insert id sym tab) e
-    rec scope id free tab (LApp f e) = LBind id'' free'' tab'' (LApp f' e')
-      where (LBind id'  free'  tab'  f') = rec scope id  free  tab  f
-            (LBind id'' free'' tab'' e') = rec scope id' free' tab' e
-    rec scope id free tab (LVec es) = List.foldr f (LBind id free tab (LVec [])) es
-      where f e (LBind id free tab (LVec es)) = let (LBind id' free' tab' e') = rec scope id free tab e
-                                                in LBind id' free' tab' (LVec (e' : es))
+    rec scope id free tab (LApp f e) = pair scope id free tab LApp f e
+    rec scope id free tab (LTag f e) = pair scope id free tab LTag f e
     rec scope id free tab (LSym sym) = case (Map.lookup sym free, Map.lookup sym scope) of
       (Nothing, Nothing) -> LBind (succ id) (Map.insert sym id free) (Map.insert id sym tab) (LSym id)
       (Just id', _)      -> LBind id free tab (LSym id')
       (_, Just id')      -> LBind id free tab (LSym id')
+    pair scope id free tab c f e = LBind id'' free'' tab'' (c f' e')
+      where (LBind id'  free'  tab'  f') = rec scope id  free  tab  f
+            (LBind id'' free'' tab'' e') = rec scope id' free' tab' e
