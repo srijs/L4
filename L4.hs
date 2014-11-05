@@ -4,6 +4,7 @@ import System.Console.Haskeline
 
 import Data.Attoparsec.Text
 import Data.Text
+import Data.Word
 
 import Parser
 
@@ -15,7 +16,7 @@ run line = do
   let expr = eitherResult $ parse lettuce $ pack line
   case expr of
     Left s -> s
-    Right r -> show (lbind r)
+    Right r -> show (lbind r :: LettuceBinding Text Word)
 
 repl = do
   maybeLine <- getInputLine "% "

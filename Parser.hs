@@ -26,22 +26,22 @@ lettuce = LFun <$> (char '{' *> skipSpace *> identifier) <*> (skipSpace *> lettu
           LApp <$> (char '(' *> skipSpace *> lettuce) <*> (skipSpace *> lettuce <* skipSpace <* char ')') <|>
           LSym <$> identifier
 
-data LettuceBinding i = LBind {
-  getSymbolCountL :: Word,
-  getFreeSymbolsL :: Map.Map i Word,
-  getSymbolTableL :: Map.Map Word i,
-  getExpressionL  :: Lettuce Word
+data LettuceBinding sym id = LBind {
+  getNextIdL      :: id,
+  getFreeSymbolsL :: Map.Map sym id,
+  getSymbolTableL :: Map.Map id sym,
+  getExpressionL  :: Lettuce id
 } deriving Show
 
-lbind :: (Eq i, Ord i) => Lettuce i -> LettuceBinding i
-lbind = rec Map.empty 0 Map.empty Map.empty
+lbind :: (Eq sym, Ord sym, Ord id, Bounded id, Enum id) => Lettuce sym -> LettuceBinding sym id
+lbind = rec Map.empty minBound Map.empty Map.empty
   where
     rec scope id free tab (LFun sym e) = LBind id' free' tab' (LFun id e')
-      where (LBind id' free' tab' e') = rec (Map.insert sym id scope) (id + 1) (Map.delete sym free) (Map.insert id sym tab) e
+      where (LBind id' free' tab' e') = rec (Map.insert sym id scope) (succ id) (Map.delete sym free) (Map.insert id sym tab) e
     rec scope id free tab (LApp f e) = LBind id'' free'' tab'' (LApp f' e')
       where (LBind id'  free'  tab'  f') = rec scope id  free  tab  f
             (LBind id'' free'' tab'' e') = rec scope id' free' tab' e
     rec scope id free tab (LSym sym) = case (Map.lookup sym free, Map.lookup sym scope) of
-      (Nothing, Nothing) -> LBind (id + 1) (Map.insert sym id free) (Map.insert id sym tab) (LSym id)
+      (Nothing, Nothing) -> LBind (succ id) (Map.insert sym id free) (Map.insert id sym tab) (LSym id)
       (Just id', _)      -> LBind id free tab (LSym id')
       (_, Just id')      -> LBind id free tab (LSym id')
