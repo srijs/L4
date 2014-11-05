@@ -10,5 +10,5 @@ data Tree = TLst [Tree]
           | TSym Text
   deriving Show
 
-tree = TLst <$> (char '(' *> sepBy tree (many1 space) <* char ')') <|>
+tree = TLst <$> (char '(' *> sepBy tree (takeWhile1 isSpace) <* char ')') <|>
        TSym <$> (takeWhile1 (\c -> c /= '(' && c /= ')' && isPrint c && not (isSpace c)))
