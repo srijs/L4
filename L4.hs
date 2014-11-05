@@ -12,10 +12,10 @@ main = do
   runInputT defaultSettings repl
 
 run line = do
-  let expr = eitherResult $ parse tree $ pack line
+  let expr = eitherResult $ parse lettuce $ pack line
   case expr of
     Left s -> s
-    Right r -> show r
+    Right r -> show (lbind r)
 
 repl = do
   maybeLine <- getInputLine "% "
