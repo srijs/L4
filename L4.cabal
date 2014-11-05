@@ -1,0 +1,11 @@
+Name:           L4
+Version:        0.0
+Cabal-Version:  >= 1.2
+License:        MIT
+Author:         Sam Rijs
+Synopsis:       A Lightweight Low-Level Lisp
+Build-Type:     Simple
+
+Executable l4
+  Main-Is:        L4.hs
+  Build-Depends:  base, containers, QuickCheck, haskeline, text, scientific, attoparsec
