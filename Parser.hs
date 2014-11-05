@@ -36,12 +36,12 @@ data LettuceBinding i = LBind {
 lbind :: (Eq i, Ord i) => Lettuce i -> LettuceBinding i
 lbind = rec Map.empty 0 Map.empty Map.empty
   where
-    rec ms w mf mb (LFun i e) = LBind w' mf' mb' (LFun w e')
-      where (LBind w' mf' mb' e') = rec (Map.insert i w ms) (w + 1) (Map.delete i mf) (Map.insert w i mb) e
-    rec ms w mf mb (LApp f e) = LBind ew (Map.union fmf emf) (Map.union fmb emb) (LApp f' e')
-      where (LBind fw fmf fmb f') = rec ms w mf mb f
-            (LBind ew emf emb e') = rec ms fw fmf fmb e
-    rec ms w mf mb (LSym i) = case (Map.lookup i mf, Map.lookup i ms) of
-      (Nothing, Nothing) -> LBind (w + 1) (Map.insert i w mf) (Map.insert w i mb) (LSym w)
-      (Just w', _)       -> LBind w mf mb (LSym w')
-      (_, Just w')       -> LBind w mf mb (LSym w')
+    rec scope id free tab (LFun sym e) = LBind id' free' tab' (LFun id e')
+      where (LBind id' free' tab' e') = rec (Map.insert sym id scope) (id + 1) (Map.delete sym free) (Map.insert id sym tab) e
+    rec scope id free tab (LApp f e) = LBind id'' free'' tab'' (LApp f' e')
+      where (LBind id'  free'  tab'  f') = rec scope id  free  tab  f
+            (LBind id'' free'' tab'' e') = rec scope id' free' tab' e
+    rec scope id free tab (LSym sym) = case (Map.lookup sym free, Map.lookup sym scope) of
+      (Nothing, Nothing) -> LBind (id + 1) (Map.insert sym id free) (Map.insert id sym tab) (LSym id)
+      (Just id', _)      -> LBind id free tab (LSym id')
+      (_, Just id')      -> LBind id free tab (LSym id')
