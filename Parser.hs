@@ -35,10 +35,11 @@ data Lettuce i = LFun i (Lettuce i)
   deriving Show
 
 lettuce :: Parser (Lettuce Text)
-lettuce = LFun <$> (char '{' *> skipSpace *> identifier) <*> (skipSpace *> lettuce <* skipSpace <* char '}') <|>
-          LApp <$> (char '(' *> skipSpace *> lettuce)    <*> (skipSpace *> lettuce <* skipSpace <* char ')') <|>
-          LTag <$> (char '[' *> skipSpace *> lettuce)    <*> (skipSpace *> lettuce <* skipSpace <* char ']') <|>
-          LSym <$> identifier
+lettuce = lfun <|> lapp <|> ltag <|> lsym
+  where lfun = LFun <$> (char '{' *> skipSpace *> identifier) <*> (skipSpace *> lettuce <* skipSpace <* char '}')
+        lapp = LApp <$> (char '(' *> skipSpace *> lettuce)    <*> (skipSpace *> lettuce <* skipSpace <* char ')')
+        ltag = LTag <$> (char '[' *> skipSpace *> lettuce)    <*> (skipSpace *> lettuce <* skipSpace <* char ']')
+        lsym = LSym <$> identifier
 
 data LettuceBinding sym id = LBind {
   getNextIdL      :: id,
