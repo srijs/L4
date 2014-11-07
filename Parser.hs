@@ -30,15 +30,15 @@ identifier = takeWhile1 (\c -> not (inClass "({[]})" c) && isPrint c && not (isS
 
 data Lettuce i = LFun i (Lettuce i)
                | LApp (Lettuce i) (Lettuce i)
-               | LTag (Lettuce i) (Lettuce i)
+               | LRec i (Lettuce i)
                | LSym i
   deriving Show
 
 lettuce :: Parser (Lettuce Text)
-lettuce = lfun <|> lapp <|> ltag <|> lsym
+lettuce = lfun <|> lapp <|> lrec <|> lsym
   where lfun = LFun <$> (char '{' *> skipSpace *> identifier) <*> (skipSpace *> lettuce <* skipSpace <* char '}')
         lapp = LApp <$> (char '(' *> skipSpace *> lettuce)    <*> (skipSpace *> lettuce <* skipSpace <* char ')')
-        ltag = LTag <$> (char '[' *> skipSpace *> lettuce)    <*> (skipSpace *> lettuce <* skipSpace <* char ']')
+        lrec = LRec <$> (char '[' *> skipSpace *> identifier) <*> (skipSpace *> lettuce <* skipSpace <* char ']')
         lsym = LSym <$> identifier
 
 data LettuceBinding sym id = LBind {
@@ -51,14 +51,15 @@ data LettuceBinding sym id = LBind {
 lbind :: (Eq sym, Ord sym, Ord id, Bounded id, Enum id) => Lettuce sym -> LettuceBinding sym id
 lbind = rec Map.empty minBound Map.empty Map.empty
   where
-    rec scope id free tab (LFun sym e) = LBind id' free' tab' (LFun id e')
-      where (LBind id' free' tab' e') = rec (Map.insert sym id scope) (succ id) (Map.delete sym free) (Map.insert id sym tab) e
+    rec scope id free tab (LFun sym e) = define scope id free tab LFun sym e
+    rec scope id free tab (LRec sym e) = define scope id free tab LRec sym e
     rec scope id free tab (LApp f e) = pair scope id free tab LApp f e
-    rec scope id free tab (LTag f e) = pair scope id free tab LTag f e
     rec scope id free tab (LSym sym) = case (Map.lookup sym free, Map.lookup sym scope) of
       (Nothing, Nothing) -> LBind (succ id) (Map.insert sym id free) (Map.insert id sym tab) (LSym id)
       (Just id', _)      -> LBind id free tab (LSym id')
       (_, Just id')      -> LBind id free tab (LSym id')
+    define scope id free tab c sym e = LBind id' free' tab' (c id e')
+      where (LBind id' free' tab' e') = rec (Map.insert sym id scope) (succ id) (Map.delete sym free) (Map.insert id sym tab) e
     pair scope id free tab c f e = LBind id'' free'' tab'' (c f' e')
       where (LBind id'  free'  tab'  f') = rec scope id  free  tab  f
             (LBind id'' free'' tab'' e') = rec scope id' free' tab' e
